@@ -2,6 +2,17 @@
 
 This is the changelog for AllyDB. It contains all the changes made to the project.
 
+### 0.6.0
+
+### Added
+
+- Support for sets.
+
+### Changed
+
+- Persistence now starts after the in memory database is fully loaded.
+- The `Allydb.Server.serve/1` function is now not returned for errors, so the server will exit properly now.
+
 ## 0.5.0
 
 ### Changed
