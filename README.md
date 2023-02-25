@@ -14,6 +14,8 @@ An in-memory database similar to Redis, built using Elixir.
 
 `(?)` means that the item is an idea, but it is unclear how it will be implemented, or how the implementation will look like.
 
+`(!)` means that the item will probably be implemented in the future, but it is not a priority.
+
 ## Features Roadmap
 
 - [x] Basic key value store
@@ -22,8 +24,8 @@ An in-memory database similar to Redis, built using Elixir.
 - [x] Persistence
 - [x] Hashes
 - [x] Sets
-- [ ] Sorted Sets
-- [ ] Pub/Sub
+- [ ] Sorted Sets (!)
+- [ ] Pub/Sub (!)
 - [ ] Clustering/Distribution (?)
 - [ ] Custom database and persistence settings (?)
 
