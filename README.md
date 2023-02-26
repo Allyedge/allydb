@@ -10,6 +10,12 @@
 
 An in-memory database similar to Redis, built using Elixir.
 
+> **Warning**  
+AllyDB now includes all the essential features as originally planned.  
+Additional roadmap features may or may not be added in the future.  
+However, the project remains a great resource for learning how to create a similar project, and AllyDB can still be used since all the basic features are available.  
+Thank you for your interest and support!
+
 ## Roadmap
 
 `(?)` means that the item is an idea, but it is unclear how it will be implemented, or how the implementation will look like.
