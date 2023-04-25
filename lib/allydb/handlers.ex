@@ -45,14 +45,19 @@ defmodule Allydb.Handlers do
     "SET #{key} #{value}"
   end
 
-  def handle_line(["EXISTS", key], socket) do
-    value = Database.exists(key)
+  def handle_line(["SETNX", key | values], socket) do
+    value = Utils.list_to_string(values)
 
-    Logger.info("EXISTS #{key} -> #{value}")
+    response = Database.setnx(key, value)
 
-    send_response(socket, value)
+    Logger.info("SETNX #{key} -> #{value}")
 
-    " "
+    send_response(socket, response)
+
+    case response do
+      1 -> "SETNX #{key} #{value}"
+      0 -> " "
+    end
   end
 
   def handle_line(["DEL", key], socket) do
