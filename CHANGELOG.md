@@ -6,7 +6,7 @@ This is the changelog for AllyDB. It contains all the changes made to the projec
 
 ### Added
 
-- `EXISTS` command to check if a key exists in the database.
+- `SETNX` command has been added.
 
 ### 0.6.0
 
