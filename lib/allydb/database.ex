@@ -268,6 +268,17 @@ defmodule Allydb.Database do
   end
 
   @impl true
+  def handle_call({:exists, key}, _from, state) do
+    case :ets.lookup(state, key) do
+      [{_, _}] ->
+        {:reply, 1, state}
+
+      [] ->
+        {:reply, 0, state}
+    end
+  end
+
+  @impl true
   def handle_call({:lpop, key}, _from, state) do
     case :ets.lookup(state, key) do
       [{_, [value | list]}] ->
@@ -579,6 +590,10 @@ defmodule Allydb.Database do
 
   def set(key, value) do
     GenServer.cast(__MODULE__, {:set, key, value})
+  end
+
+  def exists(key) do
+    GenServer.call(__MODULE__, {:exists, key})
   end
 
   def delete(key) do

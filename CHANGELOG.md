@@ -2,6 +2,12 @@
 
 This is the changelog for AllyDB. It contains all the changes made to the project.
 
+### 0.6.1
+
+### Added
+
+- `EXISTS` command to check if a key exists in the database.
+
 ### 0.6.0
 
 ### Added

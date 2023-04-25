@@ -45,6 +45,16 @@ defmodule Allydb.Handlers do
     "SET #{key} #{value}"
   end
 
+  def handle_line(["EXISTS", key], socket) do
+    value = Database.exists(key)
+
+    Logger.info("EXISTS #{key} -> #{value}")
+
+    send_response(socket, value)
+
+    " "
+  end
+
   def handle_line(["DEL", key], socket) do
     Database.delete(key)
 
