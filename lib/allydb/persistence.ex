@@ -1,12 +1,12 @@
 defmodule Allydb.Persistence do
   @moduledoc false
 
-  alias Allydb.Database
-  alias Allydb.IntervalPersistence
-  alias Allydb.Handlers
-  alias Allydb.Utils
-
   use GenServer
+
+  alias Allydb.Database
+  alias Allydb.Handlers
+  alias Allydb.IntervalPersistence
+  alias Allydb.Utils
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
@@ -57,7 +57,8 @@ defmodule Allydb.Persistence do
   defp load(state) do
     case File.exists?(state.log_persistence_location) do
       true ->
-        File.stream!(state.log_persistence_location)
+        state.log_persistence_location
+        |> File.stream!()
         |> Stream.map(&handle/1)
         |> Stream.run()
 

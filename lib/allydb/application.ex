@@ -9,8 +9,7 @@ defmodule Allydb.Application do
 
     persistence_location = System.get_env("ALLYDB_PERSISTENCE_LOCATION") || "allydb.tab"
 
-    persistence_interval =
-      String.to_integer(System.get_env("ALLYDB_PERSISTENCE_INTERVAL") || "10000")
+    persistence_interval = String.to_integer(System.get_env("ALLYDB_PERSISTENCE_INTERVAL") || "10000")
 
     log_persistence_location = System.get_env("ALLYDB_LOG_PERSISTENCE_LOCATION") || "allydb.log"
 

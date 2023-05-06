@@ -1,9 +1,9 @@
 defmodule Allydb.IntervalPersistence do
   @moduledoc false
 
-  alias Allydb.Database
-
   use GenServer
+
+  alias Allydb.Database
 
   require Logger
 

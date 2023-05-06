@@ -1,8 +1,8 @@
 defmodule Allydb.Database do
   @moduledoc false
-  alias Allydb.Utils
-
   use GenServer
+
+  alias Allydb.Utils
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)

@@ -19,6 +19,8 @@ defmodule Allydb.MixProject do
   end
 
   defp deps do
-    []
+    [
+      {:styler, "~> 0.5", only: [:dev, :test], runtime: false}
+    ]
   end
 end

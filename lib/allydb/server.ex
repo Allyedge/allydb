@@ -1,11 +1,11 @@
 defmodule Allydb.Server do
   @moduledoc false
 
-  require Logger
-
+  alias Allydb.Handlers
   alias Allydb.Persistence
   alias Allydb.Utils
-  alias Allydb.Handlers
+
+  require Logger
 
   def accept(port) do
     {:ok, socket} =
@@ -22,8 +22,7 @@ defmodule Allydb.Server do
   defp loop_acceptor(socket) do
     {:ok, client} = :gen_tcp.accept(socket)
 
-    {:ok, pid} =
-      Task.Supervisor.start_child(Allydb.Server.TaskSupervisor, fn -> serve(client) end)
+    {:ok, pid} = Task.Supervisor.start_child(Allydb.Server.TaskSupervisor, fn -> serve(client) end)
 
     :ok = :gen_tcp.controlling_process(client, pid)
 

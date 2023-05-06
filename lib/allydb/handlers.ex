@@ -1,13 +1,12 @@
 defmodule Allydb.Handlers do
   @moduledoc false
 
+  alias Allydb.Database
   alias Allydb.Utils
 
-  alias Allydb.Database
+  require Logger
 
   @new_line "\n"
-
-  require Logger
 
   def handle_line(command, socket \\ nil)
 

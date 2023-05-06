@@ -2,15 +2,11 @@ defmodule Allydb.Utils do
   @moduledoc false
 
   def chunk_two(value) do
-    value
-    |> Enum.chunk_every(2)
-    |> Enum.map(fn [k, v] -> {k, v} end)
-    |> Enum.into(%{})
+    value |> Enum.chunk_every(2) |> Map.new(fn [k, v] -> {k, v} end)
   end
 
   def list_to_string(list) do
-    list
-    |> Enum.map_join(" ", fn x -> x end)
+    Enum.map_join(list, " ", fn x -> x end)
   end
 
   def parse_line(line) do
