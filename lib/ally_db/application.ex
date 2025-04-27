@@ -11,11 +11,7 @@ defmodule AllyDB.Application do
         start: {Registry, :start_link, [[keys: :unique, name: AllyDB.Registry]]}
       },
       AllyDB.DynamicSupervisor,
-      %{
-        id: :shard_starter,
-        start: {Task, :start_link, [fn -> AllyDB.DatabaseAPI.start_shards() end]},
-        restart: :temporary
-      }
+      AllyDB.ShardInitializer
     ]
 
     opts = [strategy: :one_for_one, name: AllyDB.Supervisor]

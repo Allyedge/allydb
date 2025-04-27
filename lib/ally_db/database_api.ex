@@ -7,7 +7,6 @@ defmodule AllyDB.DatabaseAPI do
   """
 
   alias AllyDB.Core.ProcessManager
-  alias AllyDB.ShardActor
   alias AllyDB.Sharding
 
   require Logger
@@ -27,31 +26,6 @@ defmodule AllyDB.DatabaseAPI do
   end
 
   @doc """
-  Starts the configured number of ShardActor processes.
-  """
-  def start_shards do
-    Logger.info("Starting #{@num_shards} shard actors...")
-
-    Enum.each(0..(@num_shards - 1), fn shard_id ->
-      shard_process_id = "shard_#{shard_id}"
-
-      case ProcessManager.start_process(shard_process_id, ShardActor, {shard_id, %{}}) do
-        {:ok, _pid} ->
-          Logger.debug("ShardActor [#{shard_id}] started successfully.")
-
-        {:error, {:already_started, _pid}} ->
-          Logger.warning("ShardActor [#{shard_id}] already started.")
-
-        {:error, reason} ->
-          Logger.error("Failed to start ShardActor for shard #{shard_id}: #{inspect(reason)}")
-      end
-    end)
-
-    Logger.info("Shard actors startup sequence complete.")
-    :ok
-  end
-
-  @doc """
   Retrieves the value associated with the given `key`.
 
   Routes the request to the appropriate shard actor.
@@ -66,7 +40,10 @@ defmodule AllyDB.DatabaseAPI do
           GenServer.call(pid, {:get, key})
         rescue
           reason ->
-            Logger.error("Shard actor call exited for key '#{inspect key}'. PID: #{inspect pid}, Reason: #{inspect reason}")
+            Logger.error(
+              "Shard actor call exited for key '#{inspect(key)}'. PID: #{inspect(pid)}, Reason: #{inspect(reason)}"
+            )
+
             {:error, {:shard_crash, reason}}
         end
 
