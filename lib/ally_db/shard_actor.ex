@@ -6,14 +6,16 @@ defmodule AllyDB.ShardActor do
   belonging to its assigned shard. It handles internal messages for operations on that data.
   """
 
+  alias AllyDB.Core.ProcessManager
+
   use GenServer
   require Logger
 
-  @typedoc "State of the ShardActor, holding shard ID and ETS table ID."
-  @type state :: %{shard_id: non_neg_integer(), ets_tid: :ets.tab()}
-
   @typedoc "Initialization argument: {shard_id, options}."
   @type init_arg :: {non_neg_integer(), any()}
+
+  @typedoc "State of the ShardActor, holding shard ID and ETS table ID."
+  @type state :: %{shard_id: non_neg_integer(), ets_tid: :ets.tab()}
 
   @typedoc "Internal message to get a value associated with a key."
   @type get_msg :: {:get, key :: any()}
@@ -37,7 +39,6 @@ defmodule AllyDB.ShardActor do
   Creates the private ETS table for this shard.
   """
   @impl GenServer
-  @spec init(init_arg()) :: {:ok, state()}
   def init({shard_id, _opts}) do
     Logger.debug("ShardActor [#{shard_id}]: Initializing.")
 
@@ -47,7 +48,18 @@ defmodule AllyDB.ShardActor do
       :ets.new(table_name, [:set, :private, read_concurrency: true, write_concurrency: true])
 
     state = %{shard_id: shard_id, ets_tid: ets_tid}
-    {:ok, state}
+    shard_process_id = "shard_#{shard_id}"
+
+    case ProcessManager.register_process(shard_process_id, self()) do
+      {:ok, _pid} ->
+        Logger.debug("ShardActor [#{shard_id}]: Registered as '#{shard_process_id}'.")
+        {:ok, state}
+
+      {:error, reason} ->
+        Logger.error("ShardActor [#{shard_id}]: Failed to register process: #{inspect(reason)}")
+        :ets.delete(ets_tid)
+        {:stop, {:registry_error, reason}}
+    end
   end
 
   @doc """
@@ -106,6 +118,9 @@ defmodule AllyDB.ShardActor do
   @impl GenServer
   def terminate(reason, _state = %{shard_id: shard_id, ets_tid: ets_tid}) do
     Logger.debug("ShardActor [#{shard_id}]: Terminating, reason: #{inspect(reason)}")
+    shard_process_id = "shard_#{shard_id}"
+    ProcessManager.unregister_process(shard_process_id)
+    Logger.debug("ShardActor [#{shard_id}]: Unregistered.")
     :ets.delete(ets_tid)
     :ok
   end

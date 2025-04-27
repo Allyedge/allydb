@@ -8,6 +8,9 @@ defmodule AllyDB.Core.ProcessManager do
   @typedoc "Unique identifier for a process."
   @type id :: any()
 
+  @typedoc "Value of the registered process."
+  @type value :: any()
+
   @doc """
   Starts a child process under the DynamicSupervisor.
 
@@ -19,7 +22,7 @@ defmodule AllyDB.Core.ProcessManager do
           DynamicSupervisor.on_start_child()
   def start_process(id, module, init_arg) do
     child_id = {module, id}
-    child_start_arg = {id, init_arg}
+    child_start_arg = init_arg
 
     child_spec = %{
       id: child_id,
@@ -64,7 +67,7 @@ defmodule AllyDB.Core.ProcessManager do
   @doc """
   Looks up the process registered under the given `id` in the Registry.
   """
-  @spec lookup_process(id()) :: [{pid(), any()}]
+  @spec lookup_process(id()) :: [{pid(), value()}]
   def lookup_process(id) do
     Registry.lookup(AllyDB.Registry, id)
   end
