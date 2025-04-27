@@ -14,9 +14,9 @@ defmodule AllyDB.Core.ProcessManager do
   @doc """
   Starts a child process under the DynamicSupervisor.
 
-  The `init_arg` provided here will be wrapped with the `id` into a tuple
-  `{id, init_arg}` before being passed to the child's `start_link/1`.
-  The child process itself is responsible for registration via `register_process/2`.
+  The `init_arg` provided here is passed directly to the child's `start_link/1` function.
+  The child process itself is responsible for registration via `register_process/2`
+  if needed, typically during its `init/1` callback.
   """
   @spec start_process(id :: id(), module :: module(), init_arg :: any()) ::
           DynamicSupervisor.on_start_child()
