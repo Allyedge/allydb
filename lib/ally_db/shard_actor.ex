@@ -42,7 +42,10 @@ defmodule AllyDB.ShardActor do
     Logger.debug("ShardActor [#{shard_id}]: Initializing.")
 
     table_name = :"shard_#{shard_id}_table"
-    ets_tid = :ets.new(table_name, [:set, :private, read_concurrency: true, write_concurrency: true])
+
+    ets_tid =
+      :ets.new(table_name, [:set, :private, read_concurrency: true, write_concurrency: true])
+
     state = %{shard_id: shard_id, ets_tid: ets_tid}
     {:ok, state}
   end
