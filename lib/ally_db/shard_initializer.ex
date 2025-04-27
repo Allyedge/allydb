@@ -64,16 +64,16 @@ defmodule AllyDB.ShardInitializer do
 
       case ProcessManager.start_process(shard_process_id, ShardActor, {shard_id, %{}}) do
         {:ok, _pid} ->
-          Logger.debug("ShardActor [#{shard_id}] started successfully.")
+          Logger.debug("ShardActor [#{shard_id}]: Started successfully.")
           {:cont, :ok}
 
         {:error, {:already_started, _pid}} ->
-          Logger.warning("ShardActor [#{shard_id}] already started.")
+          Logger.warning("ShardActor [#{shard_id}]: Already started.")
           {:cont, :ok}
 
         {:error, reason} ->
           error_detail = {:failed_to_start_shard, shard_id, reason}
-          Logger.error("Failed to start ShardActor for shard #{shard_id}: #{inspect(reason)}")
+          Logger.error("ShardActor [#{shard_id}]: Failed to start. Reason: #{inspect(reason)}")
           {:halt, {:error, error_detail}}
       end
     end)

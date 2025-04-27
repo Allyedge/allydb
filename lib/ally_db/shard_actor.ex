@@ -45,7 +45,12 @@ defmodule AllyDB.ShardActor do
     table_name = :"shard_#{shard_id}_table"
 
     ets_tid =
-      :ets.new(table_name, [:set, :private, read_concurrency: true, write_concurrency: true])
+      :ets.new(table_name, [
+        :set,
+        :private,
+        read_concurrency: true,
+        write_concurrency: true
+      ])
 
     state = %{shard_id: shard_id, ets_tid: ets_tid}
     shard_process_id = "shard_#{shard_id}"
@@ -57,7 +62,6 @@ defmodule AllyDB.ShardActor do
 
       {:error, reason} ->
         Logger.error("ShardActor [#{shard_id}]: Failed to register process: #{inspect(reason)}")
-        :ets.delete(ets_tid)
         {:stop, {:registry_error, reason}}
     end
   end
@@ -121,7 +125,14 @@ defmodule AllyDB.ShardActor do
     shard_process_id = "shard_#{shard_id}"
     ProcessManager.unregister_process(shard_process_id)
     Logger.debug("ShardActor [#{shard_id}]: Unregistered.")
-    :ets.delete(ets_tid)
+
+    if :ets.whereis(ets_tid) != :undefined do
+      :ets.delete(ets_tid)
+      Logger.debug("ShardActor [#{shard_id}]: ETS table deleted by terminate callback.")
+    else
+      Logger.debug("ShardActor [#{shard_id}]: ETS table already deleted.")
+    end
+
     :ok
   end
 end
