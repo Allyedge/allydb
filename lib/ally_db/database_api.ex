@@ -55,7 +55,7 @@ defmodule AllyDB.DatabaseAPI do
   Retrieves the value associated with the given `key`.
 
   Routes the request to the appropriate shard actor.
-  Returns `{:ok, value}` or `{:error, reason}` where reason includes
+  Returns `{:ok, value}` or `{:error, reason}` where `reason` includes
   `:not_found`, `:shard_unavailable`, or `{:shard_crash, exit_reason}`.
   """
   @spec get(key()) :: {:ok, value()} | {:error, error_reason()}
