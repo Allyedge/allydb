@@ -32,7 +32,7 @@ defmodule AllyDB.DatabaseAPI do
   Returns `{:ok, value}` or `{:error, reason}` where `reason` includes
   `:not_found`, `:shard_unavailable`, or `{:shard_crash, exit_reason}`.
   """
-  @spec get(key()) :: {:ok, value()} | {:error, error_reason()}
+  @spec get(key :: key()) :: {:ok, value()} | {:error, error_reason()}
   def get(key) do
     case find_shard_pid(key) do
       {:ok, pid} ->
@@ -59,7 +59,7 @@ defmodule AllyDB.DatabaseAPI do
   asynchronous from the caller's perspective. Returns `:ok` if the
   responsible shard is found (message sent), `{:error, :shard_unavailable}` otherwise.
   """
-  @spec set(key(), value()) :: :ok | {:error, :shard_unavailable}
+  @spec set(key :: key(), value :: value()) :: :ok | {:error, :shard_unavailable}
   def set(key, value) do
     case find_shard_pid(key) do
       {:ok, pid} ->
@@ -78,7 +78,7 @@ defmodule AllyDB.DatabaseAPI do
   asynchronous from the caller's perspective. Returns `:ok` if the
   responsible shard is found (message sent), `{:error, :shard_unavailable}` otherwise.
   """
-  @spec delete(key()) :: :ok | {:error, :shard_unavailable}
+  @spec delete(key :: key()) :: :ok | {:error, :shard_unavailable}
   def delete(key) do
     case find_shard_pid(key) do
       {:ok, pid} ->
@@ -90,7 +90,7 @@ defmodule AllyDB.DatabaseAPI do
     end
   end
 
-  @spec find_shard_pid(key()) :: {:ok, pid()} | {:error, :shard_unavailable}
+  @spec find_shard_pid(key :: key()) :: {:ok, pid()} | {:error, :shard_unavailable}
   defp find_shard_pid(key) do
     shard_id = Sharding.hash_key_to_shard(key, @num_shards)
     shard_process_id = "shard_#{shard_id}"

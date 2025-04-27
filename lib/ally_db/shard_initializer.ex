@@ -21,6 +21,7 @@ defmodule AllyDB.ShardInitializer do
   @doc """
   Starts the ShardInitializer GenServer. Called by the application supervisor.
   """
+  @spec start_link(_opts :: any()) :: GenServer.on_start()
   def start_link(_init_arg) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
@@ -33,7 +34,7 @@ defmodule AllyDB.ShardInitializer do
   the application startup.
   """
   @impl GenServer
-  @spec init(map()) :: {:ok, map()} | {:stop, term()}
+  @spec init(_opts :: map()) :: {:ok, map()} | {:stop, term()}
   def init(_init_arg) do
     Logger.info("ShardInitializer starting...")
 

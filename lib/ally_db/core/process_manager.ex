@@ -18,7 +18,7 @@ defmodule AllyDB.Core.ProcessManager do
   `{id, init_arg}` before being passed to the child's `start_link/1`.
   The child process itself is responsible for registration via `register_process/2`.
   """
-  @spec start_process(id(), module(), init_arg :: any()) ::
+  @spec start_process(id :: id(), module :: module(), init_arg :: any()) ::
           DynamicSupervisor.on_start_child()
   def start_process(id, module, init_arg) do
     child_id = {module, id}
@@ -36,7 +36,7 @@ defmodule AllyDB.Core.ProcessManager do
   @doc """
   Terminates a child process managed by the DynamicSupervisor.
   """
-  @spec stop_process(id()) :: :ok | {:error, :not_found}
+  @spec stop_process(id :: id()) :: :ok | {:error, :not_found}
   def stop_process(id) do
     case lookup_process(id) do
       [{pid, _value}] ->
@@ -50,7 +50,7 @@ defmodule AllyDB.Core.ProcessManager do
   @doc """
   Registers the given `pid` under the unique `id` in the Registry.
   """
-  @spec register_process(id(), pid()) ::
+  @spec register_process(id :: id(), pid :: pid()) ::
           {:ok, pid()} | {:error, {:already_registered, pid()}}
   def register_process(id, pid) do
     Registry.register(AllyDB.Registry, id, pid)
@@ -59,7 +59,7 @@ defmodule AllyDB.Core.ProcessManager do
   @doc """
   Unregisters the given `id` from the Registry.
   """
-  @spec unregister_process(id()) :: :ok
+  @spec unregister_process(id :: id()) :: :ok
   def unregister_process(id) do
     Registry.unregister(AllyDB.Registry, id)
   end
@@ -67,7 +67,7 @@ defmodule AllyDB.Core.ProcessManager do
   @doc """
   Looks up the process registered under the given `id` in the Registry.
   """
-  @spec lookup_process(id()) :: [{pid(), value()}]
+  @spec lookup_process(id :: id()) :: [{pid(), value()}]
   def lookup_process(id) do
     Registry.lookup(AllyDB.Registry, id)
   end

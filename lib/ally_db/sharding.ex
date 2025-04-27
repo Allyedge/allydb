@@ -15,7 +15,7 @@ defmodule AllyDB.Sharding do
   @doc """
   Calculates the target shard index for a given key.
   """
-  @spec hash_key_to_shard(key(), num_shards()) :: shard_index()
+  @spec hash_key_to_shard(key :: key(), num_shards :: num_shards()) :: shard_index()
   def hash_key_to_shard(key, num_shards) when num_shards > 0 do
     :erlang.phash2(key, num_shards)
   end

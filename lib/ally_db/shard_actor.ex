@@ -17,6 +17,12 @@ defmodule AllyDB.ShardActor do
   @typedoc "State of the ShardActor, holding shard ID and ETS table ID."
   @type state :: %{shard_id: non_neg_integer(), ets_tid: :ets.tab()}
 
+  @typedoc "The reason for the error."
+  @type reason :: any()
+
+  @typedoc "The value set for the key."
+  @type value :: any()
+
   @typedoc "Internal message to get a value associated with a key."
   @type get_msg :: {:get, key :: any()}
   @typedoc "Internal message to set (or overwrite) a key-value pair."
@@ -29,7 +35,7 @@ defmodule AllyDB.ShardActor do
 
   This function is called by the DynamicSupervisor when instructed by `AllyDB.Core.ProcessManager.start_process/3`.
   """
-  @spec start_link(init_arg()) :: GenServer.on_start()
+  @spec start_link(init_arg :: init_arg()) :: GenServer.on_start()
   def start_link(init_arg) do
     GenServer.start_link(__MODULE__, init_arg, [])
   end
@@ -39,6 +45,7 @@ defmodule AllyDB.ShardActor do
   Creates the private ETS table for this shard.
   """
   @impl GenServer
+  @spec init(init_arg :: init_arg()) :: {:ok, state()} | {:stop, {:registry_error, reason()}}
   def init({shard_id, _opts}) do
     Logger.debug("ShardActor [#{shard_id}]: Initializing.")
 
@@ -71,8 +78,8 @@ defmodule AllyDB.ShardActor do
   Looks up the key in the shard's private ETS table.
   """
   @impl GenServer
-  @spec handle_call(get_msg(), GenServer.from(), state()) ::
-          {:reply, {:ok, any()}} | {:reply, {:error, :not_found}, state()}
+  @spec handle_call(message :: get_msg(), from :: GenServer.from(), state :: state()) ::
+          {:reply, {:ok, value()}, state()} | {:reply, {:error, :not_found}, state()}
   def handle_call({:get, key}, _from, state = %{ets_tid: ets_tid, shard_id: shard_id}) do
     case :ets.lookup(ets_tid, key) do
       [{^key, value}] ->
@@ -92,8 +99,8 @@ defmodule AllyDB.ShardActor do
   - `{:delete, key}`: Removes the key-value pair from the ETS table.
   """
   @impl GenServer
-  @spec handle_cast(set_msg(), state()) :: {:noreply, state()}
-  @spec handle_cast(delete_msg(), state()) :: {:noreply, state()}
+  @spec handle_cast(message :: set_msg(), state :: state()) :: {:noreply, state()}
+  @spec handle_cast(message :: delete_msg(), state :: state()) :: {:noreply, state()}
   def handle_cast({:set, key, value}, state = %{ets_tid: ets_tid, shard_id: shard_id}) do
     :ets.insert(ets_tid, {key, value})
     Logger.debug("ShardActor [#{shard_id}]: SET '#{inspect(key)}'")
@@ -110,6 +117,7 @@ defmodule AllyDB.ShardActor do
   Handles any unexpected messages sent to this process.
   """
   @impl GenServer
+  @spec handle_info(message :: any(), state :: state()) :: {:noreply, state()}
   def handle_info(message, state = %{shard_id: shard_id}) do
     Logger.warning("ShardActor [#{shard_id}]: Received unexpected message: #{inspect(message)}")
     {:noreply, state}
@@ -120,6 +128,7 @@ defmodule AllyDB.ShardActor do
   Ensures the associated ETS table is deleted.
   """
   @impl GenServer
+  @spec terminate(reason :: reason(), state :: state()) :: :ok
   def terminate(reason, _state = %{shard_id: shard_id, ets_tid: ets_tid}) do
     Logger.debug("ShardActor [#{shard_id}]: Terminating, reason: #{inspect(reason)}")
     shard_process_id = "shard_#{shard_id}"
