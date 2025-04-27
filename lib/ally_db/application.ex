@@ -5,7 +5,13 @@ defmodule AllyDB.Application do
 
   @impl true
   def start(_type, _args) do
-    children = []
+    children = [
+      %{
+        id: AllyDB.Registry,
+        start: {Registry, :start_link, [[keys: :unique, name: AllyDB.Registry]]}
+      },
+      AllyDB.DynamicSupervisor
+    ]
 
     opts = [strategy: :one_for_one, name: AllyDB.Supervisor]
     Supervisor.start_link(children, opts)
