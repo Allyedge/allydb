@@ -31,9 +31,9 @@ defmodule AllyDB.ActorAPI do
   @typedoc "Possible error reasons returned by API functions."
   @type error_reason ::
           :actor_not_found
+          | :call_timeout
           | {:start_failed, any()}
           | {:actor_crash, any()}
-          | {:call_timeout}
 
   @default_call_timeout 5000
 
@@ -56,33 +56,32 @@ defmodule AllyDB.ActorAPI do
           | {:error, {:already_started, pid()}}
           | {:error, {:start_failed, any()}}
   def start_actor(actor_id, actor_module, init_arg) do
-    if not Code.ensure_loaded?(actor_module) or
-         not function_exported?(actor_module, :behaviour_info, 1) or
-         :computation not in actor_module.behaviour_info(:callbacks) do
+    if Code.ensure_loaded?(actor_module) and
+         function_exported?(actor_module, :start_link, 1) do
+      case ProcessManager.start_process(actor_id, actor_module, init_arg) do
+        {:ok, pid} ->
+          Logger.info(
+            "ActorAPI: Started actor '#{inspect(actor_id)}' (Module: #{inspect(actor_module)}, PID: #{inspect(pid)})"
+          )
+
+          {:ok, pid}
+
+        {:error, {:already_started, pid}} ->
+          Logger.warning(
+            "ActorAPI: Actor '#{inspect(actor_id)}' already started (PID: #{inspect(pid)})"
+          )
+
+          {:error, {:already_started, pid}}
+
+        {:error, reason} ->
+          Logger.error(
+            "ActorAPI: Failed to start actor '#{inspect(actor_id)}' (Module: #{inspect(actor_module)}). Reason: #{inspect(reason)}"
+          )
+
+          {:error, {:start_failed, reason}}
+      end
+    else
       {:error, {:start_failed, :invalid_module}}
-    end
-
-    case ProcessManager.start_process(actor_id, actor_module, init_arg) do
-      {:ok, pid} ->
-        Logger.info(
-          "ActorAPI: Started actor '#{inspect(actor_id)}' (Module: #{inspect(actor_module)}, PID: #{inspect(pid)})"
-        )
-
-        {:ok, pid}
-
-      {:error, {:already_started, pid}} ->
-        Logger.warning(
-          "ActorAPI: Actor '#{inspect(actor_id)}' already started (PID: #{inspect(pid)})"
-        )
-
-        {:error, {:already_started, pid}}
-
-      {:error, reason} ->
-        Logger.error(
-          "ActorAPI: Failed to start actor '#{inspect(actor_id)}' (Module: #{inspect(actor_module)}). Reason: #{inspect(reason)}"
-        )
-
-        {:error, {:start_failed, reason}}
     end
   end
 
@@ -125,18 +124,19 @@ defmodule AllyDB.ActorAPI do
         try do
           GenServer.call(pid, request, timeout)
         catch
-          :exit, {:timeout, {GenServer, :call, [_, _, ^timeout]}} ->
+          :exit, {:timeout, _} ->
             Logger.error(
               "ActorAPI: Call to actor '#{inspect(actor_id)}' timed out after #{timeout}ms."
             )
 
             {:error, :call_timeout}
 
-          :exit, reason ->
-            Logger.error(
-              "ActorAPI: Call to actor '#{inspect(actor_id)}' (PID: #{inspect(pid)}) crashed. Reason: #{inspect(reason)}"
-            )
+          :exit, {:noproc, _} ->
+            Logger.error("ActorAPI: No such actor #{inspect(actor_id)}.")
+            {:error, :actor_not_found}
 
+          :exit, reason ->
+            Logger.error("ActorAPI: Actor #{inspect(actor_id)} crashed: #{inspect(reason)}")
             {:error, {:actor_crash, reason}}
         else
           reply ->

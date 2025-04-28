@@ -1,4 +1,3 @@
 import Config
 
-config :allydb,
-  num_shards: 16
+import_config("#{config_env()}.exs")

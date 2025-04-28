@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package AllyDB;
+
+import "google/protobuf/struct.proto";
+
+service DatabaseService {
+    rpc Get(GetRequest) returns (GetResponse);
+    rpc Set(SetRequest) returns (SetResponse);
+    rpc Delete(DeleteRequest) returns (DeleteResponse);
+}
+
+message GetRequest { string key = 1; }
+
+message GetResponse {
+    oneof result {
+        google.protobuf.Value value = 1;
+        bool not_found = 2;
+        bool shard_unavailable = 3;
+        string shard_crash_reason = 4;
+    }
+}
+
+message SetRequest {
+    string key = 1;
+    google.protobuf.Value value = 2;
+}
+
+message SetResponse {
+    oneof result {
+        bool ok = 1;
+        bool shard_unavailable = 2;
+    }
+}
+
+message DeleteRequest { string key = 1; }
+
+message DeleteResponse {
+    oneof result {
+        bool ok = 1;
+        bool shard_unavailable = 2;
+    }
+}
+
+service ActorService {
+    rpc StartActor(StartActorRequest) returns (StartActorResponse);
+    rpc StopActor(StopActorRequest) returns (StopActorResponse);
+    rpc CallActor(CallActorRequest) returns (CallActorResponse);
+    rpc CastActor(CastActorRequest) returns (CastActorResponse);
+}
+
+message StartActorRequest {
+    string actor_id = 1;
+    string actor_module = 2;
+    google.protobuf.Value init_args = 3;
+}
+
+message StartActorResponse {
+    oneof result {
+        bool ok = 1;
+        bool already_started = 2;
+        string start_failed_reason = 3;
+    }
+}
+
+message StopActorRequest { string actor_id = 1; }
+
+message StopActorResponse {
+    oneof result {
+        bool ok = 1;
+        bool actor_not_found = 2;
+    }
+}
+
+message CallActorRequest {
+    string actor_id = 1;
+    google.protobuf.Value request_payload = 2;
+    int64 timeout_ms = 3;
+}
+
+message CallActorResponse {
+    oneof result {
+        google.protobuf.Value reply_payload = 1;
+        bool actor_not_found = 2;
+        bool call_timeout = 3;
+        string actor_crash_reason = 4;
+    }
+}
+
+message CastActorRequest {
+    string actor_id = 1;
+    google.protobuf.Value message_payload = 2;
+}
+
+message CastActorResponse {
+    oneof result {
+        bool ok = 1;
+        bool actor_not_found = 2;
+    }
+}

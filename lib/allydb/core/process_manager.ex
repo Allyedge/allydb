@@ -21,16 +21,22 @@ defmodule AllyDB.Core.ProcessManager do
   @spec start_process(id :: id(), module :: module(), init_arg :: any()) ::
           DynamicSupervisor.on_start_child()
   def start_process(id, module, init_arg) do
-    child_id = {module, id}
-    child_start_arg = init_arg
+    case lookup_process(id) do
+      [{existing_pid, _value}] ->
+        {:error, {:already_started, existing_pid}}
 
-    child_spec = %{
-      id: child_id,
-      start: {module, :start_link, [child_start_arg]},
-      restart: :transient
-    }
+      [] ->
+        child_id = {module, id}
+        child_start_arg = init_arg
 
-    DynamicSupervisor.start_child(AllyDB.DynamicSupervisor, child_spec)
+        child_spec = %{
+          id: child_id,
+          start: {module, :start_link, [child_start_arg]},
+          restart: :transient
+        }
+
+        DynamicSupervisor.start_child(AllyDB.DynamicSupervisor, child_spec)
+    end
   end
 
   @doc """

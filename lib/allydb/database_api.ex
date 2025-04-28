@@ -20,7 +20,7 @@ defmodule AllyDB.DatabaseAPI do
   @typedoc "Possible error reasons returned by API functions."
   @type error_reason :: :not_found | :shard_unavailable | {:shard_crash, any()}
 
-  @num_shards Application.compile_env(:allydb, :num_shards, 16)
+  @num_shards Application.compile_env(:allydb, :num_shards)
   if !is_integer(@num_shards) or @num_shards < 1 do
     raise "Application environment :allydb, :num_shards must be a positive integer."
   end

@@ -23,6 +23,8 @@ defmodule AllyDB.ActorAPITest do
 
       assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 5000
 
+      Process.sleep(50)
+
       assert [] == ProcessManager.lookup_process(actor_id)
     end
 
@@ -31,7 +33,7 @@ defmodule AllyDB.ActorAPITest do
       {:ok, pid1} = ActorAPI.start_actor(actor_id, Counter, actor_id)
       assert is_pid(pid1)
 
-      assert {:error, {:start_failed, {:registry_error, {:error, {:already_registered, ^pid1}}}}} =
+      assert {:error, {:already_started, _pid}} =
                ActorAPI.start_actor(actor_id, Counter, actor_id)
 
       assert :ok = ActorAPI.stop_actor(actor_id)
@@ -72,18 +74,18 @@ defmodule AllyDB.ActorAPITest do
     end
 
     test "successfully calls an actor and gets a reply", %{actor_id: actor_id} do
-      assert {:ok, {:ok, 0}} = ActorAPI.call(actor_id, :get)
-      assert {:ok, {:ok, 1}} = ActorAPI.call(actor_id, :increment)
-      assert {:ok, {:ok, 1}} = ActorAPI.call(actor_id, :get)
+      assert {:ok, {:ok, 0}} = ActorAPI.call(actor_id, "get")
+      assert {:ok, {:ok, 1}} = ActorAPI.call(actor_id, "increment")
+      assert {:ok, {:ok, 1}} = ActorAPI.call(actor_id, "get")
     end
 
     test "returns error when calling a non-existent actor ID" do
       non_existent_id = unique_actor_id("non_existent")
-      assert {:error, :actor_not_found} = ActorAPI.call(non_existent_id, :get)
+      assert {:error, :actor_not_found} = ActorAPI.call(non_existent_id, "get")
     end
 
     test "returns error on timeout", %{actor_id: actor_id} do
-      assert {:error, :call_timeout} = ActorAPI.call(actor_id, :get, 0)
+      assert {:error, :call_timeout} = ActorAPI.call(actor_id, "get", 0)
     end
   end
 
@@ -100,21 +102,21 @@ defmodule AllyDB.ActorAPITest do
     end
 
     test "successfully casts to an actor and state changes", %{actor_id: actor_id} do
-      assert {:ok, {:ok, 0}} = ActorAPI.call(actor_id, :get)
+      assert {:ok, {:ok, 0}} = ActorAPI.call(actor_id, "get")
 
-      assert :ok = ActorAPI.cast(actor_id, :increment)
-      assert :ok = ActorAPI.cast(actor_id, :increment)
-      assert :ok = ActorAPI.cast(actor_id, :reset)
-      assert :ok = ActorAPI.cast(actor_id, :increment)
+      assert :ok = ActorAPI.cast(actor_id, "increment")
+      assert :ok = ActorAPI.cast(actor_id, "increment")
+      assert :ok = ActorAPI.cast(actor_id, "reset")
+      assert :ok = ActorAPI.cast(actor_id, "increment")
 
       Process.sleep(10)
 
-      assert {:ok, {:ok, 1}} = ActorAPI.call(actor_id, :get)
+      assert {:ok, {:ok, 1}} = ActorAPI.call(actor_id, "get")
     end
 
     test "returns error when casting to a non-existent actor ID" do
       non_existent_id = unique_actor_id("non_existent")
-      assert {:error, :actor_not_found} = ActorAPI.cast(non_existent_id, :increment)
+      assert {:error, :actor_not_found} = ActorAPI.cast(non_existent_id, "increment")
     end
   end
 
