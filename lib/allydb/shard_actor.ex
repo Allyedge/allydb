@@ -9,13 +9,18 @@ defmodule AllyDB.ShardActor do
   alias AllyDB.Core.ProcessManager
 
   use GenServer
+  @behaviour AllyDB.Snapshot
+
   require Logger
+
+  @snapshot_dir Application.compile_env!(:allydb, [:persistence, :snapshot_dir])
+  @snapshot_interval Application.compile_env!(:allydb, [:persistence, :snapshot_interval])
 
   @typedoc "Initialization argument: {shard_id, options}."
   @type init_arg :: {non_neg_integer(), any()}
 
   @typedoc "State of the ShardActor, holding shard ID and ETS table ID."
-  @type state :: %{shard_id: non_neg_integer(), ets_tid: :ets.tab()}
+  @type state :: %{shard_id: non_neg_integer(), ets_tid: :ets.tab(), dirty: boolean()}
 
   @typedoc "The reason for the error."
   @type reason :: any()
@@ -49,27 +54,56 @@ defmodule AllyDB.ShardActor do
   def init({shard_id, _opts}) do
     Logger.debug("ShardActor [#{shard_id}]: Initializing.")
 
-    table_name = :"shard_#{shard_id}_table"
+    case load_snapshot(shard_id) do
+      {:ok, snapshot} ->
+        state = restore_state(snapshot, shard_id)
+        shard_process_id = "shard_#{shard_id}"
+        Logger.debug("ShardActor [#{shard_id}]: Snapshot loaded.")
 
-    ets_tid =
-      :ets.new(table_name, [
-        :set,
-        :private,
-        read_concurrency: true,
-        write_concurrency: true
-      ])
+        case ProcessManager.register_process(shard_process_id, self()) do
+          {:ok, _pid} ->
+            Logger.debug("ShardActor [#{shard_id}]: Registered as '#{shard_process_id}'.")
 
-    state = %{shard_id: shard_id, ets_tid: ets_tid}
-    shard_process_id = "shard_#{shard_id}"
+            Process.send_after(self(), :maybe_snapshot, @snapshot_interval)
+            {:ok, state}
 
-    case ProcessManager.register_process(shard_process_id, self()) do
-      {:ok, _pid} ->
-        Logger.debug("ShardActor [#{shard_id}]: Registered as '#{shard_process_id}'.")
-        {:ok, state}
+          {:error, reason} ->
+            Logger.error(
+              "ShardActor [#{shard_id}]: Failed to register process: #{inspect(reason)}"
+            )
 
-      {:error, reason} ->
-        Logger.error("ShardActor [#{shard_id}]: Failed to register process: #{inspect(reason)}")
-        {:stop, {:registry_error, reason}}
+            {:stop, {:registry_error, reason}}
+        end
+
+      :error ->
+        table_name = :"shard_#{shard_id}_table"
+
+        ets_tid =
+          :ets.new(table_name, [
+            :set,
+            :private,
+            read_concurrency: true,
+            write_concurrency: true
+          ])
+
+        state = %{shard_id: shard_id, ets_tid: ets_tid, dirty: false}
+        shard_process_id = "shard_#{shard_id}"
+
+        case ProcessManager.register_process(shard_process_id, self()) do
+          {:ok, _pid} ->
+            Logger.debug("ShardActor [#{shard_id}]: Registered as '#{shard_process_id}'.")
+
+            state = Map.put(state, :dirty, false)
+            Process.send_after(self(), :maybe_snapshot, @snapshot_interval)
+            {:ok, state}
+
+          {:error, reason} ->
+            Logger.error(
+              "ShardActor [#{shard_id}]: Failed to register process: #{inspect(reason)}"
+            )
+
+            {:stop, {:registry_error, reason}}
+        end
     end
   end
 
@@ -104,13 +138,15 @@ defmodule AllyDB.ShardActor do
   def handle_cast({:set, key, value}, state = %{ets_tid: ets_tid, shard_id: shard_id}) do
     :ets.insert(ets_tid, {key, value})
     Logger.debug("ShardActor [#{shard_id}]: SET '#{inspect(key)}'")
-    {:noreply, state}
+    new_state = %{state | dirty: true}
+    {:noreply, new_state}
   end
 
   def handle_cast({:delete, key}, state = %{ets_tid: ets_tid, shard_id: shard_id}) do
     :ets.delete(ets_tid, key)
     Logger.debug("ShardActor [#{shard_id}]: DELETE '#{inspect(key)}'")
-    {:noreply, state}
+    new_state = %{state | dirty: true}
+    {:noreply, new_state}
   end
 
   @doc """
@@ -118,6 +154,20 @@ defmodule AllyDB.ShardActor do
   """
   @impl GenServer
   @spec handle_info(message :: any(), state :: state()) :: {:noreply, state()}
+  def handle_info(:maybe_snapshot, state) do
+    if state.dirty do
+      Logger.debug("ShardActor [#{state.shard_id}]: Snapshot.")
+
+      save_snapshot(state)
+      new_state = %{state | dirty: false}
+      Process.send_after(self(), :maybe_snapshot, @snapshot_interval)
+      {:noreply, new_state}
+    end
+
+    Process.send_after(self(), :maybe_snapshot, @snapshot_interval)
+    {:noreply, state}
+  end
+
   def handle_info(message, state = %{shard_id: shard_id}) do
     Logger.warning("ShardActor [#{shard_id}]: Received unexpected message: #{inspect(message)}")
     {:noreply, state}
@@ -135,13 +185,50 @@ defmodule AllyDB.ShardActor do
     ProcessManager.unregister_process(shard_process_id)
     Logger.debug("ShardActor [#{shard_id}]: Unregistered.")
 
-    if :ets.whereis(ets_tid) != :undefined do
+    if is_reference(ets_tid) and :ets.info(ets_tid) != :undefined do
       :ets.delete(ets_tid)
-      Logger.debug("ShardActor [#{shard_id}]: ETS table deleted by terminate callback.")
     else
       Logger.debug("ShardActor [#{shard_id}]: ETS table already deleted.")
     end
 
     :ok
+  end
+
+  @impl AllyDB.Snapshot
+  def snapshot_id(%{shard_id: shard_id}), do: "shard_#{shard_id}"
+
+  @impl AllyDB.Snapshot
+  def snapshot_state(%{ets_tid: ets_tid}) do
+    :ets.tab2list(ets_tid)
+  end
+
+  @impl AllyDB.Snapshot
+  def restore_state(snapshot, shard_id) do
+    table_name = :"shard_#{shard_id}_table"
+
+    ets_tid =
+      :ets.new(table_name, [:set, :private, read_concurrency: true, write_concurrency: true])
+
+    Enum.each(snapshot, fn {k, v} -> :ets.insert(ets_tid, {k, v}) end)
+    %{shard_id: shard_id, ets_tid: ets_tid, dirty: false}
+  end
+
+  defp snapshot_path(id), do: Path.join(@snapshot_dir, "#{id}.snapshot")
+
+  defp save_snapshot(state) do
+    id = snapshot_id(state)
+    File.mkdir_p!(@snapshot_dir)
+    File.write!(snapshot_path(id), :erlang.term_to_binary(snapshot_state(state)))
+  end
+
+  defp load_snapshot(shard_id) do
+    id = "shard_#{shard_id}"
+    path = snapshot_path(id)
+
+    if File.exists?(path) do
+      {:ok, :erlang.binary_to_term(File.read!(path))}
+    else
+      :error
+    end
   end
 end

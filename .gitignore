@@ -21,3 +21,6 @@ allydb-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Snapshots
+/priv/

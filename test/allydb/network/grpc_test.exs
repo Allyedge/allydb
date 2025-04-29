@@ -19,7 +19,7 @@ defmodule AllyDB.Network.GrpcTest do
 
   require Logger
 
-  @grpc_port Application.compile_env(:allydb, :grpc)[:port]
+  @grpc_port Application.compile_env!(:allydb, :grpc)[:port]
 
   setup_all do
     Application.ensure_all_started(:allydb)

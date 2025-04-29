@@ -5,7 +5,7 @@ defmodule AllyDB.Application do
 
   require Logger
 
-  @grpc_port Application.compile_env(:allydb, :grpc)[:port]
+  @grpc_port Application.compile_env!(:allydb, :grpc)[:port]
 
   @impl true
   def start(_type, _args) do
