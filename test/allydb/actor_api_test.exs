@@ -74,9 +74,9 @@ defmodule AllyDB.ActorAPITest do
     end
 
     test "successfully calls an actor and gets a reply", %{actor_id: actor_id} do
-      assert {:ok, {:ok, 0}} = ActorAPI.call(actor_id, "get")
-      assert {:ok, {:ok, 1}} = ActorAPI.call(actor_id, "increment")
-      assert {:ok, {:ok, 1}} = ActorAPI.call(actor_id, "get")
+      assert {:ok, {:ok, 0}} = ActorAPI.call(actor_id, :get)
+      assert {:ok, {:ok, 1}} = ActorAPI.call(actor_id, :increment)
+      assert {:ok, {:ok, 1}} = ActorAPI.call(actor_id, :get)
     end
 
     test "returns error when calling a non-existent actor ID" do
@@ -102,16 +102,16 @@ defmodule AllyDB.ActorAPITest do
     end
 
     test "successfully casts to an actor and state changes", %{actor_id: actor_id} do
-      assert {:ok, {:ok, 0}} = ActorAPI.call(actor_id, "get")
+      assert {:ok, {:ok, 0}} = ActorAPI.call(actor_id, :get)
 
-      assert :ok = ActorAPI.cast(actor_id, "increment")
-      assert :ok = ActorAPI.cast(actor_id, "increment")
-      assert :ok = ActorAPI.cast(actor_id, "reset")
-      assert :ok = ActorAPI.cast(actor_id, "increment")
+      assert :ok = ActorAPI.cast(actor_id, :increment)
+      assert :ok = ActorAPI.cast(actor_id, :increment)
+      assert :ok = ActorAPI.cast(actor_id, :reset)
+      assert :ok = ActorAPI.cast(actor_id, :increment)
 
       Process.sleep(10)
 
-      assert {:ok, {:ok, 1}} = ActorAPI.call(actor_id, "get")
+      assert {:ok, {:ok, 1}} = ActorAPI.call(actor_id, :get)
     end
 
     test "returns error when casting to a non-existent actor ID" do

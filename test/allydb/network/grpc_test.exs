@@ -51,6 +51,8 @@ defmodule AllyDB.Network.GrpcTest do
         "boolean_false" => false,
         "atom" => :an_atom,
         "list" => [1, "two", true, :three],
+        "tuple" => {:ok, 42},
+        "tuple_with_atom" => {:add, 5},
         "map" => %{"a" => 1, "b" => "bee"},
         "nil_value" => nil
       }
@@ -65,29 +67,10 @@ defmodule AllyDB.Network.GrpcTest do
         full_key = "#{key}_#{suffix}"
         req = %GetRequest{key: full_key}
         {:ok, %AllyDB.GetResponse{result: {:value, proto_val}}} = Stub.get(channel, req)
-
         retrieved_val = from_val(proto_val)
 
-        expected_val =
-          case original_val do
-            v when is_atom(v) and not is_boolean(v) and v != nil ->
-              Atom.to_string(v)
-
-            v when is_list(v) ->
-              Enum.map(v, fn
-                item when is_atom(item) and not is_boolean(item) and v != nil ->
-                  Atom.to_string(item)
-
-                item ->
-                  item
-              end)
-
-            v ->
-              v
-          end
-
-        assert retrieved_val == expected_val,
-               "Mismatch for suffix '#{suffix}'. Expected: #{inspect(expected_val)}, Got: #{inspect(retrieved_val)}"
+        assert retrieved_val == original_val,
+               "Mismatch for suffix '#{suffix}'. Expected: #{inspect(original_val)}, Got: #{inspect(retrieved_val)}"
       end
     end
 
@@ -200,42 +183,42 @@ defmodule AllyDB.Network.GrpcTest do
     test "CallActor interacts with actor state", %{channel: channel, actor_id: actor_id} do
       call_req_get1 = %CallActorRequest{
         actor_id: actor_id,
-        request_payload: to_val("get"),
+        request_payload: to_val(:get),
         timeout_ms: 1000
       }
 
       {:ok, %AllyDB.CallActorResponse{result: {:reply_payload, reply1}}} =
         ActorService.Stub.call_actor(channel, call_req_get1)
 
-      assert from_val(reply1) == {"ok", 0.0}
+      assert from_val(reply1) == {:ok, 0}
 
       call_req_inc = %CallActorRequest{
         actor_id: actor_id,
-        request_payload: to_val("increment"),
+        request_payload: to_val(:increment),
         timeout_ms: 1000
       }
 
       {:ok, %AllyDB.CallActorResponse{result: {:reply_payload, reply2}}} =
         ActorService.Stub.call_actor(channel, call_req_inc)
 
-      assert from_val(reply2) == {"ok", 1.0}
+      assert from_val(reply2) == {:ok, 1}
 
       call_req_get2 = %CallActorRequest{
         actor_id: actor_id,
-        request_payload: to_val("get"),
+        request_payload: to_val(:get),
         timeout_ms: 1000
       }
 
       {:ok, %AllyDB.CallActorResponse{result: {:reply_payload, reply3}}} =
         ActorService.Stub.call_actor(channel, call_req_get2)
 
-      assert from_val(reply3) == {"ok", 1.0}
+      assert from_val(reply3) == {:ok, 1}
     end
 
     test "CastActor interacts with actor state", %{channel: channel, actor_id: actor_id} do
       cast_req_inc = %CastActorRequest{
         actor_id: actor_id,
-        message_payload: to_val("increment")
+        message_payload: to_val(:increment)
       }
 
       assert {:ok, %AllyDB.CastActorResponse{result: {:ok, true}}} =
@@ -243,7 +226,7 @@ defmodule AllyDB.Network.GrpcTest do
 
       cast_req_reset = %CastActorRequest{
         actor_id: actor_id,
-        message_payload: to_val("reset")
+        message_payload: to_val(:reset)
       }
 
       assert {:ok, %AllyDB.CastActorResponse{result: {:ok, true}}} =
@@ -253,14 +236,59 @@ defmodule AllyDB.Network.GrpcTest do
 
       call_req_get = %CallActorRequest{
         actor_id: actor_id,
-        request_payload: to_val("get"),
+        request_payload: to_val(:get),
         timeout_ms: 1000
       }
 
       {:ok, %AllyDB.CallActorResponse{result: {:reply_payload, reply}}} =
         ActorService.Stub.call_actor(channel, call_req_get)
 
-      assert from_val(reply) == {"ok", 0.0}
+      assert from_val(reply) == {:ok, 0}
+    end
+
+    test "CallActor supports atom and tuple commands", %{channel: channel, actor_id: actor_id} do
+      call_req = %CallActorRequest{
+        actor_id: actor_id,
+        request_payload: to_val(:get),
+        timeout_ms: 1000
+      }
+
+      {:ok, %AllyDB.CallActorResponse{result: {:reply_payload, reply}}} =
+        ActorService.Stub.call_actor(channel, call_req)
+
+      assert from_val(reply) == {:ok, 0}
+
+      call_req = %CallActorRequest{
+        actor_id: actor_id,
+        request_payload: to_val({:add, 5}),
+        timeout_ms: 1000
+      }
+
+      {:ok, %AllyDB.CallActorResponse{result: {:reply_payload, reply}}} =
+        ActorService.Stub.call_actor(channel, call_req)
+
+      assert from_val(reply) == {:ok, 5}
+    end
+
+    test "CastActor supports atom and tuple commands", %{channel: channel, actor_id: actor_id} do
+      cast_req = %CastActorRequest{
+        actor_id: actor_id,
+        message_payload: to_val({:add, 5})
+      }
+
+      assert {:ok, %AllyDB.CastActorResponse{result: {:ok, true}}} =
+               ActorService.Stub.cast_actor(channel, cast_req)
+
+      call_req = %CallActorRequest{
+        actor_id: actor_id,
+        request_payload: to_val(:get),
+        timeout_ms: 1000
+      }
+
+      {:ok, %AllyDB.CallActorResponse{result: {:reply_payload, reply}}} =
+        ActorService.Stub.call_actor(channel, call_req)
+
+      assert from_val(reply) == {:ok, 5}
     end
 
     test "CallActor returns not_found for non-existent actor", %{channel: channel} do

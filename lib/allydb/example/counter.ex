@@ -25,10 +25,10 @@ defmodule AllyDB.Example.Counter do
         }
 
   @typedoc "Possible request messages for `handle_call`."
-  @type request :: String.t() | any()
+  @type request :: any()
 
   @typedoc "Possible message messages for `handle_cast`."
-  @type message :: String.t() | any()
+  @type message :: any()
 
   @doc """
   Starts a Counter actor instance.
@@ -79,16 +79,22 @@ defmodule AllyDB.Example.Counter do
           | {:noreply, new_state :: state(), timeout() | :hibernate}
           | {:stop, reason :: any(), reply :: any(), new_state :: state()}
           | {:stop, reason :: any(), new_state :: state()}
-  def handle_call("get", _from, state = %{count: count, id: id}) do
+  def handle_call(:get, _from, state = %{count: count, id: id}) do
     Logger.debug("Counter [#{inspect(id)}]: GET -> #{count}")
     {:reply, {:ok, count}, state}
   end
 
-  def handle_call("increment", _from, state = %{count: count, id: id}) do
+  def handle_call(:increment, _from, state = %{count: count, id: id}) do
     new_count = count + 1
     new_state = %{state | count: new_count}
     Logger.debug("Counter [#{inspect(id)}]: INCREMENT (sync) -> #{new_count}")
     {:reply, {:ok, new_count}, new_state}
+  end
+
+  def handle_call({:add, n}, _from, state = %{count: count, id: id}) when is_number(n) do
+    new_count = count + n
+    Logger.debug("Counter [#{inspect(id)}]: ADD (#{n}) (sync) -> #{new_count}")
+    {:reply, {:ok, new_count}, %{state | count: new_count}}
   end
 
   def handle_call(request, _from, state = %{id: id}) do
@@ -107,16 +113,23 @@ defmodule AllyDB.Example.Counter do
           {:noreply, new_state :: state()}
           | {:noreply, new_state :: state(), timeout() | :hibernate}
           | {:stop, reason :: any(), new_state :: state()}
-  def handle_cast("increment", state = %{count: count, id: id}) do
+  def handle_cast(:increment, state = %{count: count, id: id}) do
     new_count = count + 1
     new_state = %{state | count: new_count}
     Logger.debug("Counter [#{inspect(id)}]: INCREMENT (cast) -> #{new_count}")
     {:noreply, new_state}
   end
 
-  def handle_cast("reset", state = %{id: id}) do
+  def handle_cast(:reset, state = %{id: id}) do
     new_state = %{state | count: 0}
     Logger.debug("Counter [#{inspect(id)}]: RESET -> 0")
+    {:noreply, new_state}
+  end
+
+  def handle_cast({:add, n}, state = %{count: count, id: id}) when is_number(n) do
+    new_count = count + n
+    new_state = %{state | count: new_count}
+    Logger.debug("Counter [#{inspect(id)}]: ADD (#{n}) (cast) -> #{new_count}")
     {:noreply, new_state}
   end
 

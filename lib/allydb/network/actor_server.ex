@@ -89,8 +89,7 @@ defmodule AllyDB.Network.ActorServer do
     case ActorAPI.call(actor_id_str, request, effective_timeout) do
       {:ok, reply} ->
         try do
-          proto_reply = ProtoValueConverter.to_proto_value(reply)
-          %CallActorResponse{result: {:reply_payload, proto_reply}}
+          %CallActorResponse{result: {:reply_payload, ProtoValueConverter.to_proto_value(reply)}}
         rescue
           e ->
             Logger.error(
@@ -127,8 +126,11 @@ defmodule AllyDB.Network.ActorServer do
     message = ProtoValueConverter.from_proto_value(proto_message)
 
     case ActorAPI.cast(actor_id_str, message) do
-      :ok -> %CastActorResponse{result: {:ok, true}}
-      {:error, :actor_not_found} -> %CastActorResponse{result: {:actor_not_found, true}}
+      :ok ->
+        %CastActorResponse{result: {:ok, true}}
+
+      {:error, :actor_not_found} ->
+        %CastActorResponse{result: {:actor_not_found, true}}
     end
   end
 end

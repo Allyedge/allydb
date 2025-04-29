@@ -36,25 +36,38 @@ defmodule AllyDB.Network.ProtoValueConverter do
   def to_proto_value(value) when is_float(value), do: %Value{kind: {:number_value, value}}
   def to_proto_value(value) when is_binary(value), do: %Value{kind: {:string_value, value}}
 
-  def to_proto_value(value) when is_atom(value),
-    do: %Value{kind: {:string_value, Atom.to_string(value)}}
+  def to_proto_value(value) when is_atom(value) do
+    %Value{
+      kind:
+        {:struct_value,
+         %Struct{
+           fields: %{
+             "__atom__" => %Value{kind: {:bool_value, true}},
+             "name" => %Value{kind: {:string_value, Atom.to_string(value)}}
+           }
+         }}
+    }
+  end
+
+  # Tuples: explicit struct
+  def to_proto_value(tuple) when is_tuple(tuple) do
+    elements = tuple |> Tuple.to_list() |> Enum.map(&to_proto_value/1)
+
+    %Value{
+      kind:
+        {:struct_value,
+         %Struct{
+           fields: %{
+             "__tuple__" => %Value{kind: {:bool_value, true}},
+             "elements" => %Value{kind: {:list_value, %ListValue{values: elements}}}
+           }
+         }}
+    }
+  end
 
   def to_proto_value(list) when is_list(list) do
     proto_values = Enum.map(list, &to_proto_value/1)
     %Value{kind: {:list_value, %ListValue{values: proto_values}}}
-  end
-
-  def to_proto_value(tuple) when is_tuple(tuple) do
-    list = Tuple.to_list(tuple)
-    base = %{"__tuple__" => to_proto_value(true)}
-
-    fields =
-      Enum.with_index(list)
-      |> Enum.reduce(base, fn {elem, idx}, acc ->
-        Map.put(acc, Integer.to_string(idx), to_proto_value(elem))
-      end)
-
-    %Value{kind: {:struct_value, %Struct{fields: fields}}}
   end
 
   def to_proto_value(map) when is_map(map) do
@@ -82,24 +95,29 @@ defmodule AllyDB.Network.ProtoValueConverter do
   """
   @spec from_proto_value(value :: proto_value()) :: elixir_term()
   def from_proto_value(nil), do: nil
-
   def from_proto_value(%Value{kind: {:null_value, _}}), do: nil
   def from_proto_value(%Value{kind: {:number_value, num}}), do: num
   def from_proto_value(%Value{kind: {:string_value, str}}), do: str
   def from_proto_value(%Value{kind: {:bool_value, bool}}), do: bool
 
+  def from_proto_value(%Value{
+        kind: {:struct_value, %Struct{fields: %{"__atom__" => _, "name" => name_val}}}
+      }) do
+    name = from_proto_value(name_val)
+    String.to_atom(name)
+  end
+
+  def from_proto_value(%Value{
+        kind: {:struct_value, %Struct{fields: %{"__tuple__" => _, "elements" => elements_val}}}
+      }) do
+    elements = from_proto_value(elements_val)
+    List.to_tuple(elements)
+  end
+
   def from_proto_value(%Value{kind: {:struct_value, %Struct{fields: fields}}}) do
-    if Map.has_key?(fields, "__tuple__") do
-      fields
-      |> Map.delete("__tuple__")
-      |> Enum.map(fn {k, v} -> {String.to_integer(k), from_proto_value(v)} end)
-      |> Enum.sort_by(fn {idx, _} -> idx end)
-      |> Enum.map(fn {_idx, val} -> val end)
-      |> List.to_tuple()
-    else
-      fields
-      |> Enum.into(%{}, fn {k, v} -> {k, from_proto_value(v)} end)
-    end
+    Map.to_list(fields)
+    |> Enum.map(fn {k, v} -> {k, from_proto_value(v)} end)
+    |> Enum.into(%{})
   end
 
   def from_proto_value(%Value{kind: {:list_value, %ListValue{values: values}}}) do
