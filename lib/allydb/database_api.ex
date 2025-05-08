@@ -20,28 +20,52 @@ defmodule AllyDB.DatabaseAPI do
   @typedoc "Possible error reasons returned by API functions."
   @type error_reason :: :not_found | :shard_unavailable | {:shard_crash, any()}
 
-  @num_shards Application.compile_env!(:allydb, :num_shards)
-  if !is_integer(@num_shards) or @num_shards < 1 do
-    raise "Application environment :allydb, :num_shards must be a positive integer."
+  defp num_shards do
+    case Application.get_env(:allydb, :num_shards) do
+      n when is_integer(n) and n > 0 ->
+        n
+
+      other ->
+        raise "Configuration :allydb, :num_shards must be a positive integer, got: #{inspect(other)}"
+    end
   end
 
   @doc """
   Retrieves the value associated with the given `key`.
 
-  Routes the request to the appropriate shard actor.
-  Returns `{:ok, value}` or `{:error, reason}` where `reason` includes
-  `:not_found`, `:shard_unavailable`, or `{:shard_crash, exit_reason}`.
+  Performs a direct ETS lookup on the appropriate shard table for low-latency reads.
+  Falls back to a GenServer call if the ETS table is not yet available.
+  Returns `{:ok, value}` or `{:error, reason}`, where `reason` may be:
+    * `:not_found` (key missing in ETS),
+    * `:shard_unavailable` (shard process not running),
+    * `{:shard_crash, reason}` (shard process crashed during call).
   """
   @spec get(key :: key()) :: {:ok, value()} | {:error, error_reason()}
   def get(key) do
+    shard_id = Sharding.hash_key_to_shard(key, num_shards())
+    table = :"shard_#{shard_id}_table"
+
+    case safe_ets_lookup(table, key) do
+      {:ok, value} ->
+        {:ok, value}
+
+      :not_found ->
+        {:error, :not_found}
+
+      :no_table ->
+        do_get_via_server(key)
+    end
+  end
+
+  defp do_get_via_server(key) do
     case find_shard_pid(key) do
       {:ok, pid} ->
         try do
           GenServer.call(pid, {:get, key})
-        rescue
-          reason ->
+        catch
+          :exit, reason ->
             Logger.error(
-              "Shard actor call exited for key '#{inspect(key)}'. PID: #{inspect(pid)}, Reason: #{inspect(reason)}"
+              "Shard actor exited for key '#{inspect(key)}'. PID: #{inspect(pid)}, Reason: #{inspect(reason)}"
             )
 
             {:error, {:shard_crash, reason}}
@@ -50,6 +74,16 @@ defmodule AllyDB.DatabaseAPI do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp safe_ets_lookup(table, key) do
+    case :ets.lookup(table, key) do
+      [{^key, value}] -> {:ok, value}
+      [] -> :not_found
+    end
+  catch
+    :error, :badarg -> :no_table
+    :exit, _ -> :no_table
   end
 
   @doc """
@@ -92,7 +126,7 @@ defmodule AllyDB.DatabaseAPI do
 
   @spec find_shard_pid(key :: key()) :: {:ok, pid()} | {:error, :shard_unavailable}
   defp find_shard_pid(key) do
-    shard_id = Sharding.hash_key_to_shard(key, @num_shards)
+    shard_id = Sharding.hash_key_to_shard(key, num_shards())
     shard_process_id = "shard_#{shard_id}"
 
     case ProcessManager.lookup_process(shard_process_id) do

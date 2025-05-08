@@ -13,9 +13,6 @@ defmodule AllyDB.ShardActor do
 
   require Logger
 
-  @snapshot_dir Application.compile_env!(:allydb, [:persistence, :snapshot_dir])
-  @snapshot_interval Application.compile_env!(:allydb, [:persistence, :snapshot_interval])
-
   @typedoc "Initialization argument: {shard_id, options}."
   @type init_arg :: {non_neg_integer(), any()}
 
@@ -64,7 +61,7 @@ defmodule AllyDB.ShardActor do
           {:ok, _pid} ->
             Logger.debug("ShardActor [#{shard_id}]: Registered as '#{shard_process_id}'.")
 
-            Process.send_after(self(), :maybe_snapshot, @snapshot_interval)
+            Process.send_after(self(), :maybe_snapshot, snapshot_interval())
             {:ok, state}
 
           {:error, reason} ->
@@ -81,7 +78,7 @@ defmodule AllyDB.ShardActor do
         ets_tid =
           :ets.new(table_name, [
             :set,
-            :private,
+            :protected,
             read_concurrency: true,
             write_concurrency: true
           ])
@@ -94,7 +91,7 @@ defmodule AllyDB.ShardActor do
             Logger.debug("ShardActor [#{shard_id}]: Registered as '#{shard_process_id}'.")
 
             state = Map.put(state, :dirty, false)
-            Process.send_after(self(), :maybe_snapshot, @snapshot_interval)
+            Process.send_after(self(), :maybe_snapshot, snapshot_interval())
             {:ok, state}
 
           {:error, reason} ->
@@ -155,17 +152,18 @@ defmodule AllyDB.ShardActor do
   @impl GenServer
   @spec handle_info(message :: any(), state :: state()) :: {:noreply, state()}
   def handle_info(:maybe_snapshot, state) do
-    if state.dirty do
-      Logger.debug("ShardActor [#{state.shard_id}]: Snapshot.")
+    # Only run snapshot logic if state is dirty, then schedule next tick once
+    new_state =
+      if state.dirty do
+        Logger.debug("ShardActor [#{state.shard_id}]: Snapshot.")
+        save_snapshot(state)
+        %{state | dirty: false}
+      else
+        state
+      end
 
-      save_snapshot(state)
-      new_state = %{state | dirty: false}
-      Process.send_after(self(), :maybe_snapshot, @snapshot_interval)
-      {:noreply, new_state}
-    end
-
-    Process.send_after(self(), :maybe_snapshot, @snapshot_interval)
-    {:noreply, state}
+    Process.send_after(self(), :maybe_snapshot, snapshot_interval())
+    {:noreply, new_state}
   end
 
   def handle_info(message, state = %{shard_id: shard_id}) do
@@ -207,18 +205,29 @@ defmodule AllyDB.ShardActor do
     table_name = :"shard_#{shard_id}_table"
 
     ets_tid =
-      :ets.new(table_name, [:set, :private, read_concurrency: true, write_concurrency: true])
+      :ets.new(table_name, [:set, :protected, read_concurrency: true, write_concurrency: true])
 
     Enum.each(snapshot, fn {k, v} -> :ets.insert(ets_tid, {k, v}) end)
     %{shard_id: shard_id, ets_tid: ets_tid, dirty: false}
   end
 
-  defp snapshot_path(id), do: Path.join(@snapshot_dir, "#{id}.snapshot")
+  defp snapshot_path(id), do: Path.join(snapshot_dir(), "#{id}.snapshot")
 
   defp save_snapshot(state) do
     id = snapshot_id(state)
-    File.mkdir_p!(@snapshot_dir)
-    File.write!(snapshot_path(id), :erlang.term_to_binary(snapshot_state(state)))
+    # Capture snapshot data within the GenServer process due to private ETS access
+    data = snapshot_state(state)
+
+    Task.Supervisor.start_child(AllyDB.SnapshotTaskSupervisor, fn ->
+      try do
+        File.mkdir_p!(snapshot_dir())
+        tmp_path = snapshot_path(id) <> ".tmp"
+        File.write!(tmp_path, :erlang.term_to_binary(data))
+        File.rename!(tmp_path, snapshot_path(id))
+      rescue
+        e -> Logger.error("ShardActor [#{id}]: Failed to write snapshot: #{inspect(e)}")
+      end
+    end)
   end
 
   defp load_snapshot(shard_id) do
@@ -226,9 +235,21 @@ defmodule AllyDB.ShardActor do
     path = snapshot_path(id)
 
     if File.exists?(path) do
-      {:ok, :erlang.binary_to_term(File.read!(path))}
+      try do
+        {:ok, :erlang.binary_to_term(File.read!(path))}
+      rescue
+        e ->
+          Logger.error(
+            "ShardActor [#{shard_id}]: Failed to load snapshot from #{path}: #{inspect(e)}"
+          )
+
+          :error
+      end
     else
       :error
     end
   end
+
+  defp snapshot_dir, do: Application.get_env(:allydb, :persistence)[:snapshot_dir]
+  defp snapshot_interval, do: Application.get_env(:allydb, :persistence)[:snapshot_interval]
 end
