@@ -32,6 +32,15 @@ defmodule AllyDB.ShardActor do
   @typedoc "Internal message to delete a key and its associated value."
   @type delete_msg :: {:delete, key :: any()}
 
+  @typedoc "Internal messages for list operations."
+  @type lpush_msg :: {{:lpush, [any()]}, key :: any()}
+  @type rpush_msg :: {{:rpush, [any()]}, key :: any()}
+  @type lpop_msg :: {:lpop, key :: any()}
+  @type rpop_msg :: {:rpop, key :: any()}
+  @type llen_msg :: {:llen, key :: any()}
+  @type lindex_msg :: {{:lindex, integer()}, key :: any()}
+  @type lrange_msg :: {{:lrange, integer(), integer()}, key :: any()}
+
   @doc """
   Starts the ShardActor GenServer process.
 
@@ -105,7 +114,7 @@ defmodule AllyDB.ShardActor do
   end
 
   @doc """
-  Handles synchronous 'get' requests.
+  Handles synchronous 'get' requests and list operation requests.
   Looks up the key in the shard's private ETS table.
   """
   @impl GenServer
@@ -119,6 +128,169 @@ defmodule AllyDB.ShardActor do
 
       [] ->
         Logger.debug("ShardActor [#{shard_id}]: GET '#{inspect(key)}' -> Not Found")
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call({{:lpush, values}, key}, _from, state = %{ets_tid: ets_tid, shard_id: shard_id}) do
+    current_list =
+      case :ets.lookup(ets_tid, key) do
+        [{^key, list}] when is_list(list) ->
+          list
+
+        [{^key, _other}] ->
+          Logger.debug(
+            "ShardActor [#{shard_id}]: LPUSH '#{inspect(key)}' -> Type mismatch, treating as empty list"
+          )
+
+          []
+
+        [] ->
+          []
+      end
+
+    new_list = Enum.reverse(values) ++ current_list
+    :ets.insert(ets_tid, {key, new_list})
+    new_length = length(new_list)
+    Logger.debug("ShardActor [#{shard_id}]: LPUSH '#{inspect(key)}' -> New length: #{new_length}")
+    new_state = %{state | dirty: true}
+    {:reply, {:ok, new_length}, new_state}
+  end
+
+  def handle_call({{:rpush, values}, key}, _from, state = %{ets_tid: ets_tid, shard_id: shard_id}) do
+    current_list =
+      case :ets.lookup(ets_tid, key) do
+        [{^key, list}] when is_list(list) ->
+          list
+
+        [{^key, _other}] ->
+          Logger.debug(
+            "ShardActor [#{shard_id}]: RPUSH '#{inspect(key)}' -> Type mismatch, treating as empty list"
+          )
+
+          []
+
+        [] ->
+          []
+      end
+
+    new_list = current_list ++ values
+    :ets.insert(ets_tid, {key, new_list})
+    new_length = length(new_list)
+    Logger.debug("ShardActor [#{shard_id}]: RPUSH '#{inspect(key)}' -> New length: #{new_length}")
+    new_state = %{state | dirty: true}
+    {:reply, {:ok, new_length}, new_state}
+  end
+
+  def handle_call({:lpop, key}, _from, state = %{ets_tid: ets_tid, shard_id: shard_id}) do
+    case :ets.lookup(ets_tid, key) do
+      [{^key, [head | tail]}] ->
+        :ets.insert(ets_tid, {key, tail})
+        Logger.debug("ShardActor [#{shard_id}]: LPOP '#{inspect(key)}' -> Popped element")
+        new_state = %{state | dirty: true}
+        {:reply, {:ok, head}, new_state}
+
+      [{^key, []}] ->
+        Logger.debug("ShardActor [#{shard_id}]: LPOP '#{inspect(key)}' -> Empty list")
+        {:reply, {:error, :empty_list}, state}
+
+      [{^key, _other}] ->
+        Logger.debug("ShardActor [#{shard_id}]: LPOP '#{inspect(key)}' -> Type mismatch")
+        {:reply, {:error, :not_found}, state}
+
+      [] ->
+        Logger.debug("ShardActor [#{shard_id}]: LPOP '#{inspect(key)}' -> Not found")
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call({:rpop, key}, _from, state = %{ets_tid: ets_tid, shard_id: shard_id}) do
+    case :ets.lookup(ets_tid, key) do
+      [{^key, list}] when is_list(list) and length(list) > 0 ->
+        {popped_element, new_list} = List.pop_at(list, -1)
+        :ets.insert(ets_tid, {key, new_list})
+        Logger.debug("ShardActor [#{shard_id}]: RPOP '#{inspect(key)}' -> Popped element")
+        new_state = %{state | dirty: true}
+        {:reply, {:ok, popped_element}, new_state}
+
+      [{^key, []}] ->
+        Logger.debug("ShardActor [#{shard_id}]: RPOP '#{inspect(key)}' -> Empty list")
+        {:reply, {:error, :empty_list}, state}
+
+      [{^key, _other}] ->
+        Logger.debug("ShardActor [#{shard_id}]: RPOP '#{inspect(key)}' -> Type mismatch")
+        {:reply, {:error, :not_found}, state}
+
+      [] ->
+        Logger.debug("ShardActor [#{shard_id}]: RPOP '#{inspect(key)}' -> Not found")
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call({:llen, key}, _from, state = %{ets_tid: ets_tid, shard_id: shard_id}) do
+    case :ets.lookup(ets_tid, key) do
+      [{^key, list}] when is_list(list) ->
+        list_length = length(list)
+        Logger.debug("ShardActor [#{shard_id}]: LLEN '#{inspect(key)}' -> Length: #{list_length}")
+        {:reply, {:ok, list_length}, state}
+
+      [{^key, _other}] ->
+        Logger.debug("ShardActor [#{shard_id}]: LLEN '#{inspect(key)}' -> Type mismatch")
+        {:reply, {:error, :not_found}, state}
+
+      [] ->
+        Logger.debug("ShardActor [#{shard_id}]: LLEN '#{inspect(key)}' -> Not found")
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call({{:lindex, index}, key}, _from, state = %{ets_tid: ets_tid, shard_id: shard_id}) do
+    case :ets.lookup(ets_tid, key) do
+      [{^key, list}] when is_list(list) ->
+        case safe_list_at(list, index) do
+          {:ok, value} ->
+            Logger.debug("ShardActor [#{shard_id}]: LINDEX '#{inspect(key)}' [#{index}] -> Found")
+            {:reply, {:ok, value}, state}
+
+          :error ->
+            Logger.debug(
+              "ShardActor [#{shard_id}]: LINDEX '#{inspect(key)}' [#{index}] -> Index out of range"
+            )
+
+            {:reply, {:error, :index_out_of_range}, state}
+        end
+
+      [{^key, _other}] ->
+        Logger.debug("ShardActor [#{shard_id}]: LINDEX '#{inspect(key)}' -> Type mismatch")
+        {:reply, {:error, :not_found}, state}
+
+      [] ->
+        Logger.debug("ShardActor [#{shard_id}]: LINDEX '#{inspect(key)}' -> Not found")
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call(
+        {{:lrange, start, stop}, key},
+        _from,
+        state = %{ets_tid: ets_tid, shard_id: shard_id}
+      ) do
+    case :ets.lookup(ets_tid, key) do
+      [{^key, list}] when is_list(list) ->
+        result = safe_list_slice(list, start, stop)
+
+        Logger.debug(
+          "ShardActor [#{shard_id}]: LRANGE '#{inspect(key)}' [#{start}:#{stop}] -> #{length(result)} elements"
+        )
+
+        {:reply, {:ok, result}, state}
+
+      [{^key, _other}] ->
+        Logger.debug("ShardActor [#{shard_id}]: LRANGE '#{inspect(key)}' -> Type mismatch")
+        {:reply, {:error, :not_found}, state}
+
+      [] ->
+        Logger.debug("ShardActor [#{shard_id}]: LRANGE '#{inspect(key)}' -> Not found")
         {:reply, {:error, :not_found}, state}
     end
   end
@@ -211,11 +383,67 @@ defmodule AllyDB.ShardActor do
     %{shard_id: shard_id, ets_tid: ets_tid, dirty: false}
   end
 
+  defp safe_list_at(list, index) do
+    normalized_index = normalize_index(index, length(list))
+
+    if normalized_index >= 0 and normalized_index < length(list) do
+      {:ok, Enum.at(list, normalized_index)}
+    else
+      :error
+    end
+  end
+
+  defp safe_list_slice(list, start, stop) do
+    list_length = length(list)
+
+    cond do
+      list_length == 0 ->
+        []
+
+      out_of_bounds?(start, stop, list_length) ->
+        []
+
+      true ->
+        extract_slice(list, start, stop, list_length)
+    end
+  end
+
+  defp out_of_bounds?(start, stop, list_length) do
+    normalized_start = normalize_index(start, list_length)
+    normalized_stop = normalize_index(stop, list_length)
+
+    normalized_start >= list_length or normalized_stop < 0 or normalized_start > normalized_stop
+  end
+
+  defp extract_slice(list, start, stop, list_length) do
+    normalized_start = normalize_index(start, list_length)
+    normalized_stop = normalize_index(stop, list_length)
+
+    start_idx = max(0, normalized_start)
+    stop_idx = min(normalized_stop, list_length - 1)
+
+    if start_idx <= stop_idx do
+      list
+      |> Enum.with_index()
+      |> Enum.filter(fn {_elem, idx} -> idx >= start_idx and idx <= stop_idx end)
+      |> Enum.map(fn {elem, _idx} -> elem end)
+    else
+      []
+    end
+  end
+
+  defp normalize_index(index, list_length) when index < 0 do
+    list_length + index
+  end
+
+  defp normalize_index(index, _list_length) do
+    index
+  end
+
   defp snapshot_path(id), do: Path.join(snapshot_dir(), "#{id}.snapshot")
 
   defp save_snapshot(state) do
     id = snapshot_id(state)
-    # Capture snapshot data within the GenServer process due to private ETS access
     data = snapshot_state(state)
 
     Task.Supervisor.start_child(AllyDB.SnapshotTaskSupervisor, fn ->

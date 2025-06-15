@@ -58,6 +58,167 @@ defmodule AllyDB.DeleteResponse do
   field(:shard_unavailable, 2, type: :bool, json_name: "shardUnavailable", oneof: 0)
 end
 
+defmodule AllyDB.LPushRequest do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  field(:key, 1, type: :string)
+  field(:values, 2, repeated: true, type: Google.Protobuf.Value)
+end
+
+defmodule AllyDB.LPushResponse do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  oneof(:result, 0)
+
+  field(:new_length, 1, type: :int64, json_name: "newLength", oneof: 0)
+  field(:shard_unavailable, 2, type: :bool, json_name: "shardUnavailable", oneof: 0)
+  field(:shard_crash_reason, 3, type: :string, json_name: "shardCrashReason", oneof: 0)
+end
+
+defmodule AllyDB.RPushRequest do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  field(:key, 1, type: :string)
+  field(:values, 2, repeated: true, type: Google.Protobuf.Value)
+end
+
+defmodule AllyDB.RPushResponse do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  oneof(:result, 0)
+
+  field(:new_length, 1, type: :int64, json_name: "newLength", oneof: 0)
+  field(:shard_unavailable, 2, type: :bool, json_name: "shardUnavailable", oneof: 0)
+  field(:shard_crash_reason, 3, type: :string, json_name: "shardCrashReason", oneof: 0)
+end
+
+defmodule AllyDB.LPopRequest do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  field(:key, 1, type: :string)
+end
+
+defmodule AllyDB.LPopResponse do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  oneof(:result, 0)
+
+  field(:value, 1, type: Google.Protobuf.Value, oneof: 0)
+  field(:empty_list, 2, type: :bool, json_name: "emptyList", oneof: 0)
+  field(:not_found, 3, type: :bool, json_name: "notFound", oneof: 0)
+  field(:shard_unavailable, 4, type: :bool, json_name: "shardUnavailable", oneof: 0)
+  field(:shard_crash_reason, 5, type: :string, json_name: "shardCrashReason", oneof: 0)
+end
+
+defmodule AllyDB.RPopRequest do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  field(:key, 1, type: :string)
+end
+
+defmodule AllyDB.RPopResponse do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  oneof(:result, 0)
+
+  field(:value, 1, type: Google.Protobuf.Value, oneof: 0)
+  field(:empty_list, 2, type: :bool, json_name: "emptyList", oneof: 0)
+  field(:not_found, 3, type: :bool, json_name: "notFound", oneof: 0)
+  field(:shard_unavailable, 4, type: :bool, json_name: "shardUnavailable", oneof: 0)
+  field(:shard_crash_reason, 5, type: :string, json_name: "shardCrashReason", oneof: 0)
+end
+
+defmodule AllyDB.LLenRequest do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  field(:key, 1, type: :string)
+end
+
+defmodule AllyDB.LLenResponse do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  oneof(:result, 0)
+
+  field(:length, 1, type: :int64, oneof: 0)
+  field(:not_found, 2, type: :bool, json_name: "notFound", oneof: 0)
+  field(:shard_unavailable, 3, type: :bool, json_name: "shardUnavailable", oneof: 0)
+  field(:shard_crash_reason, 4, type: :string, json_name: "shardCrashReason", oneof: 0)
+end
+
+defmodule AllyDB.LIndexRequest do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  field(:key, 1, type: :string)
+  field(:index, 2, type: :int64)
+end
+
+defmodule AllyDB.LIndexResponse do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  oneof(:result, 0)
+
+  field(:value, 1, type: Google.Protobuf.Value, oneof: 0)
+  field(:index_out_of_range, 2, type: :bool, json_name: "indexOutOfRange", oneof: 0)
+  field(:not_found, 3, type: :bool, json_name: "notFound", oneof: 0)
+  field(:shard_unavailable, 4, type: :bool, json_name: "shardUnavailable", oneof: 0)
+  field(:shard_crash_reason, 5, type: :string, json_name: "shardCrashReason", oneof: 0)
+end
+
+defmodule AllyDB.LRangeRequest do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  field(:key, 1, type: :string)
+  field(:start, 2, type: :int64)
+  field(:stop, 3, type: :int64)
+end
+
+defmodule AllyDB.LRangeResponse do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  oneof(:result, 0)
+
+  field(:values, 1, type: AllyDB.ListValues, oneof: 0)
+  field(:not_found, 2, type: :bool, json_name: "notFound", oneof: 0)
+  field(:shard_unavailable, 3, type: :bool, json_name: "shardUnavailable", oneof: 0)
+  field(:shard_crash_reason, 4, type: :string, json_name: "shardCrashReason", oneof: 0)
+end
+
+defmodule AllyDB.ListValues do
+  @moduledoc false
+
+  use Protobuf, protoc_gen_elixir_version: "0.14.0", syntax: :proto3
+
+  field(:values, 1, repeated: true, type: Google.Protobuf.Value)
+end
+
 defmodule AllyDB.StartActorRequest do
   @moduledoc false
 
@@ -152,6 +313,20 @@ defmodule AllyDB.DatabaseService.Service do
   rpc(:Set, AllyDB.SetRequest, AllyDB.SetResponse)
 
   rpc(:Delete, AllyDB.DeleteRequest, AllyDB.DeleteResponse)
+
+  rpc(:LPush, AllyDB.LPushRequest, AllyDB.LPushResponse)
+
+  rpc(:RPush, AllyDB.RPushRequest, AllyDB.RPushResponse)
+
+  rpc(:LPop, AllyDB.LPopRequest, AllyDB.LPopResponse)
+
+  rpc(:RPop, AllyDB.RPopRequest, AllyDB.RPopResponse)
+
+  rpc(:LLen, AllyDB.LLenRequest, AllyDB.LLenResponse)
+
+  rpc(:LIndex, AllyDB.LIndexRequest, AllyDB.LIndexResponse)
+
+  rpc(:LRange, AllyDB.LRangeRequest, AllyDB.LRangeResponse)
 end
 
 defmodule AllyDB.DatabaseService.Stub do

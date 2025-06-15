@@ -8,6 +8,13 @@ service DatabaseService {
     rpc Get(GetRequest) returns (GetResponse);
     rpc Set(SetRequest) returns (SetResponse);
     rpc Delete(DeleteRequest) returns (DeleteResponse);
+    rpc LPush(LPushRequest) returns (LPushResponse);
+    rpc RPush(RPushRequest) returns (RPushResponse);
+    rpc LPop(LPopRequest) returns (LPopResponse);
+    rpc RPop(RPopRequest) returns (RPopResponse);
+    rpc LLen(LLenRequest) returns (LLenResponse);
+    rpc LIndex(LIndexRequest) returns (LIndexResponse);
+    rpc LRange(LRangeRequest) returns (LRangeResponse);
 }
 
 message GetRequest { string key = 1; }
@@ -41,6 +48,99 @@ message DeleteResponse {
         bool shard_unavailable = 2;
     }
 }
+
+message LPushRequest {
+    string key = 1;
+    repeated google.protobuf.Value values = 2;
+}
+
+message LPushResponse {
+    oneof result {
+        int64 new_length = 1;
+        bool shard_unavailable = 2;
+        string shard_crash_reason = 3;
+    }
+}
+
+message RPushRequest {
+    string key = 1;
+    repeated google.protobuf.Value values = 2;
+}
+
+message RPushResponse {
+    oneof result {
+        int64 new_length = 1;
+        bool shard_unavailable = 2;
+        string shard_crash_reason = 3;
+    }
+}
+
+message LPopRequest { string key = 1; }
+
+message LPopResponse {
+    oneof result {
+        google.protobuf.Value value = 1;
+        bool empty_list = 2;
+        bool not_found = 3;
+        bool shard_unavailable = 4;
+        string shard_crash_reason = 5;
+    }
+}
+
+message RPopRequest { string key = 1; }
+
+message RPopResponse {
+    oneof result {
+        google.protobuf.Value value = 1;
+        bool empty_list = 2;
+        bool not_found = 3;
+        bool shard_unavailable = 4;
+        string shard_crash_reason = 5;
+    }
+}
+
+message LLenRequest { string key = 1; }
+
+message LLenResponse {
+    oneof result {
+        int64 length = 1;
+        bool not_found = 2;
+        bool shard_unavailable = 3;
+        string shard_crash_reason = 4;
+    }
+}
+
+message LIndexRequest {
+    string key = 1;
+    int64 index = 2;
+}
+
+message LIndexResponse {
+    oneof result {
+        google.protobuf.Value value = 1;
+        bool index_out_of_range = 2;
+        bool not_found = 3;
+        bool shard_unavailable = 4;
+        string shard_crash_reason = 5;
+    }
+}
+
+message LRangeRequest {
+    string key = 1;
+    int64 start = 2;
+    int64 stop = 3;
+}
+
+message LRangeResponse {
+    oneof result {
+        ListValues values = 1;
+        bool not_found = 2;
+        bool shard_unavailable = 3;
+        string shard_crash_reason = 4;
+    }
+}
+
+message ListValues { repeated google.protobuf.Value values = 1; }
 
 service ActorService {
     rpc StartActor(StartActorRequest) returns (StartActorResponse);
